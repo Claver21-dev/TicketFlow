@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TicketFlow — Vos événements, vos billets</title>
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo" onclick="showPage('home')">Ticket<span>Flow</span></div>
+  <div class="spacer"></div>
+  <span class="nav-link" onclick="showPage('home')">Événements</span>
+  <span class="nav-link" onclick="openAuth()">Connexion</span>
+  <button class="nav-cart" onclick="showPage('cart')">
+    🎟 Panier
+    <span class="cart-badge" id="cartCount">0</span>
+  </button>
+</nav>
+
+<!-- ═══════════════ PAGE ACCUEIL ═══════════════ -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <h1>Trouvez votre<br>prochain événement</h1>
+    <p>Concerts, conférences, sport, soirées... Tous les billets au meilleur prix, livrés en quelques clics.</p>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Rechercher un événement, un artiste..." oninput="filterEvents()">
+      <button onclick="filterEvents()">Rechercher</button>
+    </div>
+  </div>
+
+  <div class="categories">
+    <div class="cat-pills" id="catPills">
+      <div class="cat-pill active" onclick="filterCat(this,'tous')"> Tous</div>
+      <div class="cat-pill" onclick="filterCat(this,'concert')"> Concerts</div>
+      <div class="cat-pill" onclick="filterCat(this,'sport')"> Sport</div>
+      <div class="cat-pill" onclick="filterCat(this,'conference')"> Conférences</div>
+      <div class="cat-pill" onclick="filterCat(this,'soiree')"> Soirées</div>
+      <div class="cat-pill" onclick="filterCat(this,'festival')"> Festivals</div>
+      <div class="cat-pill" onclick="filterCat(this,'theatre')"> Théâtre</div>
+    </div>
+  </div>
+
+  <div class="events-section">
+    <div class="section-title" id="eventsTitle">Tous les événements</div>
+    <div class="events-grid" id="eventsGrid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE DÉTAIL ═══════════════ -->
+<div id="page-detail" class="page">
+  <div class="detail-back">
+    <button onclick="showPage('home')">← Retour aux événements</button>
+  </div>
+  <div class="detail-content">
+    <div class="detail-left" id="detailLeft"></div>
+    <div class="detail-right" id="detailRight"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE PANIER ═══════════════ -->
+<div id="page-cart" class="page">
+  <div class="cart-page">
+    <h2 class="section-title" style="margin-bottom:1.5rem">🛒 Mon panier</h2>
+    <div id="cartContent"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE SUCCÈS ═══════════════ -->
+<div id="page-success" class="page">
+  <div class="success-page">
+    <div class="success-icon">🎉</div>
+    <h2>Commande confirmée !</h2>
+    <p>Vos billets ont été réservés avec succès. Un e-mail de confirmation vous sera envoyé très prochainement.</p>
+    <button class="btn btn-primary" onclick="resetCart(); showPage('home')">Retour à l'accueil</button>
+  </div>
+</div>
+
+<!-- MODAL AUTH -->
+<div class="modal-overlay" id="authModal" onclick="closeAuthOnClick(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuth()">✕</button>
+    <h2 id="authTitle">Bonjour !</h2>
+    <p class="modal-sub" id="authSub">Connectez-vous pour accéder à vos billets.</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Connexion</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Inscription</button>
+    </div>
+    <div id="authForm"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const EVENTS = [
+  { id:1, title:"Aya Nakamura – Live Tour 2025", cat:"concert", emoji:"", bg:"#EAF3DE", date:"12 Juil 2025", heure:"20h00", lieu:"Stade Félix Houphouët-Boigny, Abidjan", desc:"La chanteuse aux millions de fans revient en Afrique pour une tournée épique. Une soirée de RnB, afropop et émotion garantie.", dispo:342, tickets:[{name:"Pelouse",price:5000},{name:"Tribune",price:15000},{name:"VIP",price:35000}] },
+  { id:2, title:"Africa Tech Summit 2025", cat:"conference", emoji:"", bg:"#E6F1FB", date:"25 Août 2025", heure:"09h00", lieu:"Sofitel Abidjan, Plateau", desc:"Le plus grand rassemblement tech d'Afrique de l'Ouest. Startups, investisseurs, innovateurs se retrouvent pour 2 jours d'inspiration.", dispo:120, tickets:[{name:"Pass Journée",price:20000},{name:"Pass Complet",price:35000}] },
+  { id:3, title:"ASEC Mimosas vs Stade d'Abidjan", cat:"sport", emoji:"", bg:"#FAEEDA", date:"6 Juil 2025", heure:"15h00", lieu:"Stade Robert Champroux", desc:"Le derby ivoirien par excellence. Deux clubs légendaires s'affrontent dans une ambiance électrique. Ne ratez pas ce classique !", dispo:1500, tickets:[{name:"Tribune populaire",price:1000},{name:"Tribune couverte",price:3500},{name:"Loge VIP",price:12000}] },
+  { id:4, title:"Soirée AfroVibes – Nuit Blanche", cat:"soiree", emoji:"", bg:"#FAECE7", date:"19 Juil 2025", heure:"22h00", lieu:"Palais des Congrès, Abidjan", desc:"La plus grande soirée afrobeat & coupé-décalé d'Abidjan. DJs internationaux, cocktails exotiques, ambiance folle toute la nuit.", dispo:80, tickets:[{name:"Entrée Standard",price:5000},{name:"Table VIP",price:50000}] },
+  { id:5, title:"Festival Abidjan Jazz", cat:"festival", emoji:"", bg:"#E1F5EE", date:"5 Août 2025", heure:"18h00", lieu:"Jardin de l'Indépendance, Plateau", desc:"4 jours de jazz sous les étoiles avec des artistes locaux et internationaux. Une expérience culturelle unique au cœur d'Abidjan.", dispo:250, tickets:[{name:"Pass Journée",price:3000},{name:"Pass Festival",price:10000},{name:"VIP Lounge",price:25000}] },
+  { id:6, title:"Pièce de Théâtre : \"L'Exil\"", cat:"theatre", emoji:"", bg:"#FBEAF0", date:"30 Juil 2025", heure:"19h30", lieu:"Centre Culturel Français, Abidjan", desc:"Une pièce poignante sur l'immigration et l'identité, mise en scène par le collectif Théâtre Vivant CI. Une œuvre bouleversante.", dispo:60, tickets:[{name:"Placement libre",price:2500},{name:"Placement numéroté",price:5000}] },
+];
+
+let cart = [];
+let currentCat = 'tous';
+let selectedQtys = {};
+
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function filterCat(el, cat) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  renderEvents();
+}
+
+function filterEvents() {
+  renderEvents();
+}
+
+function renderEvents() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const grid = document.getElementById('eventsGrid');
+  let filtered = EVENTS.filter(e => {
+    const matchCat = currentCat === 'tous' || e.cat === currentCat;
+    const matchQ = e.title.toLowerCase().includes(q) || e.lieu.toLowerCase().includes(q);
+    return matchCat && matchQ;
+  });
+
+  if (!filtered.length) {
+    grid.innerHTML = '<p style="color:var(--gray-600);padding:2rem 0">Aucun événement trouvé pour cette recherche.</p>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(e => `
+    <div class="event-card" onclick="openDetail(${e.id})">
+      <div class="event-img" style="background:${e.bg}">${e.emoji}</div>
+      <div class="event-body">
+        <div class="event-tag">${catLabel(e.cat)}</div>
+        <h3>${e.title}</h3>
+        <div class="event-meta">
+          <span>📅 ${e.date} · ${e.heure}</span>
+          <span>📍 ${e.lieu}</span>
+          <span style="color:#0F6E56;font-weight:600">🎟 ${e.dispo} billets restants</span>
+        </div>
+        <div class="event-footer">
+          <div class="event-price">À partir de ${fmt(Math.min(...e.tickets.map(t=>t.price)))} FCFA</div>
+          <button class="btn btn-primary" onclick="openDetail(${e.id});event.stopPropagation()">Voir →</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function catLabel(c) {
+  return {concert:'Concert',sport:'Sport',conference:'Conférence',soiree:'Soirée',festival:'Festival',theatre:'Théâtre'}[c] || c;
+}
+
+function fmt(n) { return n.toLocaleString('fr-FR'); }
+
+function openDetail(id) {
+  const e = EVENTS.find(ev => ev.id === id);
+  selectedQtys = {};
+  e.tickets.forEach((t,i) => selectedQtys[i] = 0);
+
+  document.getElementById('detailLeft').innerHTML = `
+    <div class="detail-hero-img" style="background:${e.bg}">${e.emoji}</div>
+    <div class="detail-tag">${catLabel(e.cat)}</div>
+    <h1 class="detail-title">${e.title}</h1>
+    <div class="detail-infos">
+      <div class="detail-info-row"><div class="detail-info-icon">📅</div><span>${e.date} · ${e.heure}</span></div>
+      <div class="detail-info-row"><div class="detail-info-icon">📍</div><span>${e.lieu}</span></div>
+      <div class="detail-info-row"><div class="detail-info-icon">🎟</div><span style="color:#0F6E56;font-weight:600">${e.dispo} billets disponibles</span></div>
+    </div>
+    <p class="detail-desc">${e.desc}</p>
+  `;
+
+  renderTicketBox(e);
+  showPage('detail');
+}
+
+function renderTicketBox(e) {
+  const total = e.tickets.reduce((s,t,i) => s + t.price * (selectedQtys[i]||0), 0);
+  const qtyTotal = Object.values(selectedQtys).reduce((a,b)=>a+b,0);
+
+  document.getElementById('detailRight').innerHTML = `
+    <div class="ticket-box">
+      <h4>Choisir vos billets</h4>
+      ${e.tickets.map((t,i) => `
+        <div class="ticket-type ${selectedQtys[i]>0?'selected':''}" id="tt${i}">
+          <div class="ticket-type-header">
+            <div class="ticket-type-name">${t.name}</div>
+            <div class="ticket-type-price">${fmt(t.price)} FCFA</div>
+          </div>
+          <div class="ticket-qty">
+            <button class="qty-btn" onclick="changeQty(${e.id},${i},-1)">−</button>
+            <span class="qty-val" id="qty${i}">${selectedQtys[i]||0}</span>
+            <button class="qty-btn" onclick="changeQty(${e.id},${i},1)">+</button>
+          </div>
+        </div>
+      `).join('')}
+      <div class="ticket-total">
+        <span>Total</span>
+        <span class="ticket-total-price">${fmt(total)} FCFA</span>
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" 
+        onclick="addToCart(${e.id})" ${qtyTotal===0?'disabled style="opacity:.5;cursor:not-allowed"':''}>
+        Ajouter au panier
+      </button>
+    </div>
+  `;
+}
+
+function changeQty(eventId, ticketIdx, delta) {
+  selectedQtys[ticketIdx] = Math.max(0, (selectedQtys[ticketIdx]||0) + delta);
+  const e = EVENTS.find(ev => ev.id === eventId);
+  renderTicketBox(e);
+}
+
+function addToCart(eventId) {
+  const e = EVENTS.find(ev => ev.id === eventId);
+  let added = false;
+  e.tickets.forEach((t,i) => {
+    const qty = selectedQtys[i] || 0;
+    if (qty > 0) {
+      const key = `${eventId}-${i}`;
+      const existing = cart.find(c => c.key === key);
+      if (existing) existing.qty += qty;
+      else cart.push({ key, eventId, ticketIdx: i, name: e.title, ticket: t.name, price: t.price, qty, emoji: e.emoji, bg: e.bg });
+      added = true;
+    }
+  });
+  if (added) {
+    updateCartBadge();
+    showToast('✅ Billets ajoutés au panier !', 'success');
+    showPage('cart');
+    renderCart();
+  }
+}
+
+function updateCartBadge() {
+  const total = cart.reduce((s,i) => s+i.qty, 0);
+  document.getElementById('cartCount').textContent = total;
+}
+
+function renderCart() {
+  const el = document.getElementById('cartContent');
+  if (!cart.length) {
+    el.innerHTML = `
+      <div class="empty-cart">
+        <div>🎟</div>
+        <h3>Votre panier est vide</h3>
+        <p>Explorez nos événements et ajoutez vos billets préférés.</p>
+        <button class="btn btn-primary" onclick="showPage('home')">Voir les événements</button>
+      </div>`;
+    return;
+  }
+
+  const subtotal = cart.reduce((s,i) => s + i.price*i.qty, 0);
+  const fees = Math.round(subtotal * 0.02);
+
+  el.innerHTML = `
+    ${cart.map(item => `
+      <div class="cart-item">
+        <div class="cart-item-emoji" style="background:${item.bg}">${item.emoji}</div>
+        <div class="cart-item-info">
+          <h4>${item.name}</h4>
+          <p>${item.ticket} · ${item.qty} billet${item.qty>1?'s':''}</p>
+        </div>
+        <div class="cart-item-right">
+          <span class="cart-item-price">${fmt(item.price * item.qty)} FCFA</span>
+          <button class="remove-btn" onclick="removeFromCart('${item.key}')">✕ Retirer</button>
+        </div>
+      </div>
+    `).join('')}
+    <div class="cart-summary">
+      <div class="cart-summary-row"><span>Sous-total</span><span>${fmt(subtotal)} FCFA</span></div>
+      <div class="cart-summary-row"><span>Frais de service (2%)</span><span>${fmt(fees)} FCFA</span></div>
+      <div class="cart-summary-row total"><span>Total</span><span>${fmt(subtotal+fees)} FCFA</span></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;margin-top:1rem;font-size:0.95rem" onclick="checkout()">
+        Procéder au paiement →
+      </button>
+    </div>
+  `;
+}
+
+function removeFromCart(key) {
+  cart = cart.filter(i => i.key !== key);
+  updateCartBadge();
+  renderCart();
+  showToast('Billet retiré du panier');
+}
+
+function resetCart() {
+  cart = [];
+  updateCartBadge();
+}
+
+function checkout() {
+  showPage('success');
+  setTimeout(() => resetCart(), 100);
+}
+
+// AUTH
+function openAuth() {
+  document.getElementById('authModal').classList.add('active');
+  switchTab('login');
+}
+
+function closeAuth() {
+  document.getElementById('authModal').classList.remove('active');
+}
+
+function closeAuthOnClick(e) {
+  if (e.target === document.getElementById('authModal')) closeAuth();
+}
+
+function switchTab(tab) {
+  document.getElementById('tabLogin').classList.toggle('active', tab==='login');
+  document.getElementById('tabRegister').classList.toggle('active', tab==='register');
+
+  if (tab === 'login') {
+    document.getElementById('authTitle').textContent = 'Bonjour !';
+    document.getElementById('authSub').textContent = 'Connectez-vous pour accéder à vos billets.';
+    document.getElementById('authForm').innerHTML = `
+      <div class="form-group"><label>Email</label><input type="email" placeholder="vous@exemple.com"></div>
+      <div class="form-group"><label>Mot de passe</label><input type="password" placeholder="••••••••"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;margin-top:0.5rem" onclick="fakeLogin()">Se connecter</button>
+    `;
+  } else {
+    document.getElementById('authTitle').textContent = 'Créer un compte';
+    document.getElementById('authSub').textContent = 'Rejoignez TicketFlow gratuitement.';
+    document.getElementById('authForm').innerHTML = `
+      <div class="form-group"><label>Nom complet</label><input type="text" placeholder="Votre nom"></div>
+      <div class="form-group"><label>Email</label><input type="email" placeholder="vous@exemple.com"></div>
+      <div class="form-group"><label>Mot de passe</label><input type="password" placeholder="Choisissez un mot de passe"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;margin-top:0.5rem" onclick="fakeRegister()">Créer mon compte</button>
+    `;
+  }
+}
+
+function fakeLogin() {
+  closeAuth();
+  showToast('✅ Connexion réussie !', 'success');
+}
+
+function fakeRegister() {
+  closeAuth();
+  showToast('✅ Compte créé avec succès !', 'success');
+}
+
+// TOAST
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = 'toast'; }, 2800);
+}
+
+// INIT
+renderEvents();
+</script>
+</body>
+</html>
